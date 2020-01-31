@@ -1,0 +1,15 @@
+{
+  "name": "elm-in-action",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "dependencies": {},
+  "devDependencies": {
+    "elm-live": "^4.0.1"
+  },
+  "scripts": {
+    "start": "elm-live src/PhotoGroove.elm"
+  },
+  "author": "",
+  "license": "ISC"
+}
