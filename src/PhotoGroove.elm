@@ -2,11 +2,12 @@ module PhotoGroove exposing (main)
 
 import Browser
 import Html exposing (..)
-import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Attributes as Attr exposing (..)
+import Html.Events exposing (on, onClick)
 import Http
-import Json.Decode exposing (Decoder, bool, int, list, string, succeed)
+import Json.Decode exposing (Decoder, at, int, list, string, succeed)
 import Json.Decode.Pipeline exposing (optional, required)
+import Json.Encode as Encode
 import Random
 
 
@@ -21,6 +22,9 @@ type Msg
     | ClickedSurpriseMe
     | GotRandomPhoto Photo
     | GotPhotos (Result Http.Error (List Photo))
+    | SlidHue Int
+    | SlidRipple Int
+    | SlidNoise Int
 
 
 view : Model -> Html Msg
@@ -28,7 +32,7 @@ view model =
     div [ class "content" ] <|
         case model.status of
             Loaded photos selectedUrl ->
-                viewLoaded photos selectedUrl model.chosenSize
+                viewLoaded model photos selectedUrl model.chosenSize
 
             Loading ->
                 []
@@ -37,15 +41,34 @@ view model =
                 [ text ("Error: " ++ errorMessage) ]
 
 
-viewLoaded : List Photo -> String -> ThumbnailSize -> List (Html Msg)
-viewLoaded photos selectedUrl chosenSize =
+viewFilter : (Int -> Msg) -> String -> Int -> Html Msg
+viewFilter toMsg name magnitude =
+    div [ class "filter-slider" ]
+        [ label [] [ text name ]
+        , rangeSlider
+            [ Attr.max "11"
+            , Attr.property "val" (Encode.int magnitude)
+            , onSlide toMsg
+            ]
+            []
+        , label [] [ text (String.fromInt magnitude) ]
+        ]
+
+
+viewLoaded : Model -> List Photo -> String -> ThumbnailSize -> List (Html Msg)
+viewLoaded model photos selectedUrl chosenSize =
     [ h1 [] [ text "Photo Groove" ]
     , button
         [ onClick ClickedSurpriseMe ]
         [ text "Surprise Me!" ]
+    , div [ class "filters" ]
+        [ viewFilter SlidHue "Hue" model.hue
+        , viewFilter SlidRipple "Ripple" model.ripple
+        , viewFilter SlidNoise "Noise" model.noise
+        ]
     , h3 [] [ text "Thumbnail Size:" ]
     , div [ id "choose-size" ]
-        (List.map viewSizeChooser [ Small, Medium, Large ])
+        (List.map (viewSizeChooser chosenSize) [ Small, Medium, Large ])
     , div [ id "thumbnails", class (sizeToString chosenSize) ]
         (List.map (viewThumbnail selectedUrl) photos)
     , img
@@ -67,10 +90,10 @@ viewThumbnail selectedUrl thumb =
         []
 
 
-viewSizeChooser : ThumbnailSize -> Html Msg
-viewSizeChooser size =
+viewSizeChooser : ThumbnailSize -> ThumbnailSize -> Html Msg
+viewSizeChooser chosenSize size =
     label []
-        [ input [ type_ "radio", name "size", onClick (ClickedSize size) ] []
+        [ input [ type_ "radio", name "size", onClick (ClickedSize size), checked (size == chosenSize) ] []
         , text (sizeToString size)
         ]
 
@@ -118,6 +141,9 @@ type Status
 type alias Model =
     { status : Status
     , chosenSize : ThumbnailSize
+    , hue : Int
+    , ripple : Int
+    , noise : Int
     }
 
 
@@ -125,6 +151,9 @@ initialModel : Model
 initialModel =
     { status = Loading
     , chosenSize = Medium
+    , hue = 5
+    , ripple = 5
+    , noise = 5
     }
 
 
@@ -169,6 +198,15 @@ update msg model =
         GotPhotos (Err httpError) ->
             ( { model | status = Errored "Server error!" }, Cmd.none )
 
+        SlidHue hue ->
+            ( { model | hue = hue }, Cmd.none )
+
+        SlidRipple ripple ->
+            ( { model | ripple = ripple }, Cmd.none )
+
+        SlidNoise noise ->
+            ( { model | noise = noise }, Cmd.none )
+
 
 selectUrl : String -> Status -> Status
 selectUrl url status =
@@ -199,3 +237,15 @@ main =
         , update = update
         , subscriptions = \_ -> Sub.none
         }
+
+
+rangeSlider : List (Attribute msg) -> List (Html msg) -> Html msg
+rangeSlider attributes children =
+    node "range-slider" attributes children
+
+
+onSlide : (Int -> msg) -> Attribute msg
+onSlide toMsg =
+    at [ "detail", "userSlidTo" ] int
+        |> Json.Decode.map toMsg
+        |> on "slide"

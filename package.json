@@ -8,7 +8,7 @@
     "elm-live": "^4.0.1"
   },
   "scripts": {
-    "start": "elm-live src/PhotoGroove.elm"
+    "start": "elm-live src/PhotoGroove.elm -- --output=elm.js"
   },
   "author": "",
   "license": "ISC"
